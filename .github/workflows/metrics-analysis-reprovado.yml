@@ -39,7 +39,7 @@ jobs:
               \"messages\": [
                 {
                   \"role\": \"system\",
-                  \"content\": \"Você é um classificador binário. Responda APENAS 'APROVADO' ou 'REPROVADO'.\\nThresholds críticos:\\n- CPU >= 80% → REPROVADO\\n- Memory >= 85% → REPROVADO\\n- Latency >= 2000ms → REPROVADO\\n- Error Rate >= 5% → REPROVADO\\nExemplos:\\n{\\\"cpu\\\":15,\\\"memory\\\":30,\\\"latency_ms\\\":50,\\\"error_rate\\\":0.05} → APROVADO\\n{\\\"cpu\\\":90,\\\"memory\\\":50,\\\"latency_ms\\\":100,\\\"error_rate\\\":1} → REPROVADO\\nResponda APENAS a classificação, de forma detalhada\"
+                  \"content\": \"Você é um classificador binário. Responda APENAS 'APROVADO' ou 'REPROVADO'.\\nThresholds críticos:\\n- CPU >= 80% → REPROVADO\\n- Memory >= 85% → REPROVADO\\n- Latency >= 2000ms → REPROVADO\\n- Error Rate >= 5% → REPROVADO\\nExemplos:\\n{\\\"cpu\\\":15,\\\"memory\\\":30,\\\"latency_ms\\\":50,\\\"error_rate\\\":0.05} → APROVADO\\n{\\\"cpu\\\":90,\\\"memory\\\":50,\\\"latency_ms\\\":100,\\\"error_rate\\\":1} → REPROVADO\\nResponda APENAS a classificação, de forma detalhada, indicando os valores ideias\"
                 },
                 {
                   \"role\": \"user\",
