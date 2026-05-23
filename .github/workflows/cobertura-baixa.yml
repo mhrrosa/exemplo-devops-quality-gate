@@ -1,0 +1,107 @@
+name: Cobertura Baixa
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cobertura-baixa:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          pip install pytest pytest-cov openai
+
+      - name: Rodar testes com cobertura baixa
+        env:
+          PYTHONPATH: .
+        run: |
+          pytest tests_baixa --cov=src_baixa --cov-report=term --cov-report=json
+
+      - name: Analisar cobertura com IA
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4.1-mini
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          from openai import OpenAI
+
+          with open("coverage.json", "r", encoding="utf-8") as file:
+              coverage_data = json.load(file)
+
+          cobertura = coverage_data["totals"]["percent_covered"]
+
+          print(f"Cobertura encontrada: {cobertura}%")
+
+          prompt = f"""
+          Você é um agente inteligente de DevOps responsável por analisar um Quality Gate.
+
+          Contexto:
+          - Projeto: SmartShop Cloud
+          - Linguagem: Python
+          - Framework de testes: pytest
+          - Ferramenta de cobertura: pytest-cov
+          - Cobertura total encontrada: {cobertura:.2f}%
+          - Critério mínimo de qualidade: 80%
+
+          Regras:
+          - Se a cobertura for menor que 80%, a decisão deve ser BLOQUEADO.
+          - Se a cobertura for maior ou igual a 80%, a decisão deve ser APROVADO.
+          - Justifique de forma curta e objetiva.
+
+          Responda exclusivamente em JSON válido, neste formato:
+          {{
+            "decisao": "APROVADO ou BLOQUEADO",
+            "motivo": "explicação curta"
+          }}
+          """
+
+          client = OpenAI()
+
+          response = client.responses.create(
+              model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+              input=prompt
+          )
+
+          resposta_ia = response.output_text.strip()
+
+          print("Resposta da IA:")
+          print(resposta_ia)
+
+          match = re.search(r"\{.*\}", resposta_ia, re.DOTALL)
+
+          if not match:
+              print("❌ A IA não retornou um JSON válido.")
+              sys.exit(1)
+
+          resultado = json.loads(match.group(0))
+
+          decisao = resultado.get("decisao", "").upper()
+          motivo = resultado.get("motivo", "")
+
+          print(f"Decisão da IA: {decisao}")
+          print(f"Motivo: {motivo}")
+
+          if decisao == "BLOQUEADO":
+              print("❌ Pipeline bloqueada pela IA devido à baixa cobertura.")
+              sys.exit(1)
+
+          if decisao == "APROVADO":
+              print("✅ Pipeline aprovada pela IA.")
+              sys.exit(0)
+
+          print("❌ Decisão inválida retornada pela IA.")
+          sys.exit(1)
+          PY
