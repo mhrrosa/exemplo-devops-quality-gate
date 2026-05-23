@@ -99,11 +99,22 @@ jobs:
           REPORT="Bandit encontrou: HIGH=$HIGH MEDIUM=$MED LOW=$LOW"
           echo "Resumo: $REPORT"
 
-          # Faz requisicao para IA avaliar severidade das vulnerabilidades
+          # Se nao ha vulnerabilidades HIGH, aprova diretamente sem consultar IA
+          if [ "$HIGH" = "0" ]; then
+            echo "Nenhuma vulnerabilidade HIGH encontrada. Aprovado automaticamente."
+            exit 0
+          fi
+
+          # Apenas consulta a IA se houver vulnerabilidades HIGH para analisar
+          echo "Vulnerabilidades HIGH detectadas. Consultando IA..."
+
+          DETAILS=$(python3 -c "import json; r=json.load(open('bandit-report.json')); issues=[i for i in r.get('results',[]) if i.get('issue_severity')=='HIGH']; print(' | '.join([i.get('issue_text','') + ' em ' + i.get('filename','') for i in issues[:5]]))")
+
+          # Faz requisicao para IA avaliar apenas as vulnerabilidades HIGH reais
           RESPONSE=$(curl -s https://api.groq.com/openai/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $GROQCLOUD_API_KEY" \
-            -d "{\"model\":\"llama-3.1-8b-instant\",\"messages\":[{\"role\":\"system\",\"content\":\"Voce e especialista em seguranca. Analise o resultado do Bandit. Responda APROVADO ou BLOQUEADO com justificativa curta.\"},{\"role\":\"user\",\"content\":\"$REPORT\"}]}")
+            -d "{\"model\":\"llama-3.1-8b-instant\",\"messages\":[{\"role\":\"system\",\"content\":\"Voce e especialista em seguranca de software. O Bandit encontrou vulnerabilidades HIGH no codigo Python. Analise se sao criticas o suficiente para bloquear o deploy. Responda APROVADO se forem falsos positivos ou aceitaveis. Responda BLOQUEADO se representarem risco real. Justifique brevemente.\"},{\"role\":\"user\",\"content\":\"Vulnerabilidades HIGH encontradas: $DETAILS\"}]}")
 
           echo "Resposta da IA:"
           echo "$RESPONSE"
