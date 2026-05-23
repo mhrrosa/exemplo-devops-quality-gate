@@ -1,0 +1,254 @@
+# Nome do workflow exibido no GitHub Actions
+name: Pipeline - Seguranca, Changelog e PR Automatico
+
+# Define quando o workflow sera executado
+on:
+
+  # Executa automaticamente em pushes de feature e fix branches
+  push:
+    branches:
+      - 'feature/**'
+      - 'fix/**'
+
+  # Permite execucao manual pelo botao Run workflow
+  workflow_dispatch:
+
+# Permissoes necessarias para criacao de PR e issues
+permissions:
+
+  # Permite leitura e escrita no repositorio
+  contents: write
+
+  # Permite criar e gerenciar pull requests
+  pull-requests: write
+
+  # Permite criar issues automaticamente
+  issues: write
+
+# Lista de jobs do pipeline
+jobs:
+
+  # JOB 1 - Captura o nome da branch atual
+  detectar-contexto:
+
+    # Maquina virtual Linux
+    runs-on: ubuntu-latest
+
+    # Output compartilhado com os outros jobs
+    outputs:
+      branch: ${{ steps.detectar.outputs.branch }}
+
+    steps:
+
+      # Clona repositorio com historico completo
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Captura o nome da branch e salva como output
+      - name: Detectar branch atual
+        id: detectar
+        run: |
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Branch detectada: $BRANCH"
+
+  # JOB 2 - Analise de vulnerabilidades com Bandit e IA
+  seguranca:
+
+    # Maquina virtual Linux
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Clona repositorio
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+
+      # Configura ambiente Python
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Instala Bandit para analise estatica de seguranca
+      - name: Instalar Bandit
+        run: |
+          pip install bandit
+
+      # Executa Bandit em todo o codigo fonte
+      - name: Executar analise de seguranca - Bandit
+        run: |
+          echo "Iniciando analise de seguranca com Bandit..."
+          bandit -r src_alta src_baixa -f json -o bandit-report.json || true
+          echo "Analise Bandit concluida."
+
+      # Envia relatorio do Bandit para IA avaliar criticidade
+      - name: IA analisa vulnerabilidades - Quality Gate
+        env:
+          GROQCLOUD_API_KEY: ${{ secrets.GROQCLOUD_API_KEY }}
+        run: |
+          echo "Consultando IA sobre vulnerabilidades encontradas..."
+
+          # Extrai contagem por severidade usando Python one-liners
+          HIGH=$(python3 -c "import json; r=json.load(open('bandit-report.json')); print(len([i for i in r.get('results',[]) if i.get('issue_severity')=='HIGH']))")
+          MED=$(python3 -c "import json; r=json.load(open('bandit-report.json')); print(len([i for i in r.get('results',[]) if i.get('issue_severity')=='MEDIUM']))")
+          LOW=$(python3 -c "import json; r=json.load(open('bandit-report.json')); print(len([i for i in r.get('results',[]) if i.get('issue_severity')=='LOW']))")
+
+          REPORT="Bandit encontrou: HIGH=$HIGH MEDIUM=$MED LOW=$LOW"
+          echo "Resumo: $REPORT"
+
+          # Faz requisicao para IA avaliar severidade das vulnerabilidades
+          RESPONSE=$(curl -s https://api.groq.com/openai/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GROQCLOUD_API_KEY" \
+            -d "{\"model\":\"llama-3.1-8b-instant\",\"messages\":[{\"role\":\"system\",\"content\":\"Voce e especialista em seguranca. Analise o resultado do Bandit. Responda APROVADO ou BLOQUEADO com justificativa curta.\"},{\"role\":\"user\",\"content\":\"$REPORT\"}]}")
+
+          echo "Resposta da IA:"
+          echo "$RESPONSE"
+
+          # Extrai apenas o texto da decisao
+          DECISION=$(echo "$RESPONSE" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['choices'][0]['message']['content'] if 'choices' in r else 'BLOQUEADO - erro ao consultar IA')")
+
+          echo "Decisao de seguranca:"
+          echo "$DECISION"
+
+          # Se IA detectar vulnerabilidades criticas, bloqueia pipeline
+          if echo "$DECISION" | grep -q "BLOQUEADO"; then
+            echo "::error::Vulnerabilidades criticas detectadas pelo Bandit e IA"
+            exit 1
+          fi
+
+          echo "Analise de seguranca aprovada."
+
+      # Salva relatorio Bandit como artefato do pipeline
+      - name: Salvar relatorio Bandit como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  # JOB 3 - Geracao automatica de changelog com IA
+  changelog:
+
+    # Maquina virtual Linux
+    runs-on: ubuntu-latest
+
+    # Executa apos seguranca passar
+    needs: seguranca
+
+    steps:
+
+      # Clona repositorio com historico completo
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Gera changelog bruto a partir dos commits
+      - name: Gerar changelog dos commits
+        run: |
+          echo "Gerando changelog dos commits..."
+
+          # Lista commits entre main e HEAD em formato legivel
+          git log origin/main...HEAD --pretty=format:"- %s (%h)" 2>/dev/null > changelog.txt || git log HEAD~5..HEAD --pretty=format:"- %s (%h)" > changelog.txt
+
+          echo "Changelog gerado:"
+          cat changelog.txt
+
+      # IA formata changelog de forma profissional
+      - name: IA formata changelog - formato profissional
+        env:
+          GROQCLOUD_API_KEY: ${{ secrets.GROQCLOUD_API_KEY }}
+        run: |
+          echo "Consultando IA para gerar changelog profissional..."
+
+          # Coleta mensagens de commit para enviar a IA
+          COMMITS=$(git log origin/main...HEAD --pretty=format:"%s" 2>/dev/null | head -20 | tr '\n' '; ' || echo "Commits nao disponiveis")
+
+          # Faz requisicao para IA formatar changelog profissional
+          RESPONSE=$(curl -s https://api.groq.com/openai/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GROQCLOUD_API_KEY" \
+            -d "{\"model\":\"llama-3.1-8b-instant\",\"messages\":[{\"role\":\"system\",\"content\":\"Voce e especialista em release notes. Gere um changelog profissional em portugues com secoes: Novas Funcionalidades, Correcoes de Bugs e Melhorias.\"},{\"role\":\"user\",\"content\":\"Commits: $COMMITS\"}]}")
+
+          # Extrai e exibe changelog gerado pela IA
+          CHANGELOG_IA=$(echo "$RESPONSE" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['choices'][0]['message']['content'] if 'choices' in r else 'Erro ao gerar changelog')")
+
+          echo "Changelog gerado pela IA:"
+          echo "$CHANGELOG_IA"
+
+          # Salva changelog formatado em arquivo para uso no PR
+          echo "$CHANGELOG_IA" > changelog-ia.txt
+
+      # Salva arquivos de changelog como artefato para uso no proximo job
+      - name: Salvar changelog como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-files
+          path: |
+            changelog.txt
+            changelog-ia.txt
+
+  # JOB 4 - Criacao automatica de Pull Request
+  criar-pr:
+
+    # Maquina virtual Linux
+    runs-on: ubuntu-latest
+
+    # Executa apos geracao do changelog
+    needs: [changelog, detectar-contexto]
+
+    steps:
+
+      # Clona repositorio com historico completo
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Baixa artefato de changelog gerado no job anterior
+      - name: Baixar artefato de changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog-files
+
+      # Faz login no GitHub CLI para criar o PR
+      - name: Login GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      # Cria PR automatico se ainda nao existir para esta branch
+      - name: Criar Pull Request automatico
+        env:
+          BRANCH: ${{ needs.detectar-contexto.outputs.branch }}
+        run: |
+          echo "Verificando se ja existe PR para branch: $BRANCH"
+
+          # Verifica se ja existe PR aberto para esta branch
+          PR_EXISTS=$(gh pr list --head "$BRANCH" --state open --json number --jq length 2>/dev/null || echo "0")
+
+          # Se nao houver PR aberto, cria um novo
+          if [ "$PR_EXISTS" = "0" ] || [ -z "$PR_EXISTS" ]; then
+
+            echo "Criando PR automatico para branch: $BRANCH"
+
+            # Le changelog gerado e monta corpo do PR
+            CHANGELOG=$(cat changelog.txt 2>/dev/null || echo "Sem commits novos")
+            printf "## Changelog\n\n%s\n\n## Checklist do Pipeline\n\n- [x] Analise de seguranca aprovada\n- [x] Changelog gerado automaticamente\n\n_PR criado automaticamente pelo pipeline_" "$CHANGELOG" > pr-body.md
+
+            # Cria PR usando arquivo de corpo
+            PR_URL=$(gh pr create \
+              --title "Auto PR - $BRANCH" \
+              --body-file pr-body.md \
+              --base main \
+              --head "$BRANCH")
+
+            echo "PR criado com sucesso: $PR_URL"
+
+          else
+
+            echo "PR ja existe para a branch $BRANCH. Nenhum PR duplicado criado."
+
+          fi
