@@ -1,0 +1,5 @@
+INFO Aplicação iniciada
+INFO Usuário autenticado
+WARNING Tempo de resposta elevado
+ERROR Database connection timeout
+CRITICAL Falha ao salvar pagamento
