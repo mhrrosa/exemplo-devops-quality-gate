@@ -101,7 +101,14 @@ ou
 }}
 """
 
-    client = Groq(api_key=os.getenv("GROQ_API_KEY") or os.getenv("GROQCLOUD_API_KEY"))
+    api_key = os.getenv("GROQ_API_KEY") or os.getenv("GROQCLOUD_API_KEY")
+
+    if not api_key:
+        print("\n[ERRO] GROQ_API_KEY não encontrada!")
+        print("Certifique-se de configurar a variável de ambiente GROQ_API_KEY.")
+        return "BLOCK"
+
+    client = Groq(api_key=api_key)
 
     print("\n===== ANALISANDO QUALIDADE DO BUILD (GROQ IA) =====")
     print(f"Cobertura: {ctx['cobertura_pct']:.1f}%")
