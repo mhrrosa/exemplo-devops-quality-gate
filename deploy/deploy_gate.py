@@ -58,6 +58,7 @@ def carregar_contexto(raiz: Path) -> dict:
 
     return contexto
 
+# Deploy Gate - Verificação de qualidade com IA
 def rodar_deploy_gate(raiz: Path) -> str:
     """
     Consulta um modelo hospedado no Groq e
