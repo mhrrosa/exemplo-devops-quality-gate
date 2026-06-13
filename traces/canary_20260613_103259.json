@@ -1,0 +1,29 @@
+[
+  {
+    "timestamp": "2026-06-13T10:33:00.399786",
+    "cpu_pct": 15,
+    "memory_pct": 30,
+    "latency_ms": 50,
+    "error_rate_pct": 0.05,
+    "percentual_trafego": 10,
+    "fase_aprovada": true
+  },
+  {
+    "timestamp": "2026-06-13T10:33:01.400815",
+    "cpu_pct": 15,
+    "memory_pct": 30,
+    "latency_ms": 50,
+    "error_rate_pct": 0.05,
+    "percentual_trafego": 50,
+    "fase_aprovada": true
+  },
+  {
+    "timestamp": "2026-06-13T10:33:02.401492",
+    "cpu_pct": 15,
+    "memory_pct": 30,
+    "latency_ms": 50,
+    "error_rate_pct": 0.05,
+    "percentual_trafego": 100,
+    "fase_aprovada": true
+  }
+]

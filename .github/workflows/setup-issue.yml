@@ -1,0 +1,42 @@
+name: Setup — Criar Issue Única
+on:
+  push:
+    branches: [ main ]
+jobs:
+  create-setup-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Para criar o arquivo flag
+      issues: write # Para criar issues
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar se setup já foi executado
+        id: check-flag
+        run: |
+          if [ -f ".github/setup-done.flag" ]; then
+            echo "already_done=true" >> $GITHUB_OUTPUT
+          else
+            echo "already_done=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Criar issue de setup
+        if: steps.check-flag.outputs.already_done == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: "✅ Pipeline configurado com sucesso",
+              body: `## Setup do Pipeline Concluído\n\n **Data:** ${new Date().toISOString()}\n **Run ID:** ${context.runId}\n\n O pipeline foi configurado e está pronto para uso.\n\n ### Próximos passos\n - [ ] Configurar branch protection rules\n - [ ] Adicionar secrets necessários\n - [ ] Revisar configurações de qualidade`,
+              labels: ["setup", "automation"]
+            });
+      - name: Criar arquivo flag
+        if: steps.check-flag.outputs.already_done == 'false'
+        run: |
+          mkdir -p .github
+          echo "Pipeline setup completed on $(date)" > .github/setup-done.flag
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/setup-done.flag
+          git commit -m "chore: marcar setup do pipeline como concluído [skip ci]"
+          git push

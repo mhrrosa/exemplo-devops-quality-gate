@@ -1,0 +1,84 @@
+name: Canary Deployment e Quality Gate Automático
+
+on:
+  push:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: pip install pytest pytest-cov bandit groq
+      
+      - name: Run Tests and Coverage
+        env:
+          PYTHONPATH: .
+        run: |
+          pytest tests_alta --cov=src_alta --cov-report=json || true
+      
+      - name: Run Security Audit
+        run: bandit -r src_alta -f json -o bandit-report.json || true
+        
+      - name: AI Quality Gate Decision
+        env:
+          GROQCLOUD_API_KEY: ${{ secrets.GROQCLOUD_API_KEY }}
+        run: python scripts/deploy_gate.py
+        
+      - name: Upload Traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-traces
+          path: traces/
+
+  canary-rollout:
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Simulate Canary Deployment
+        id: canary
+        run: python scripts/canary_simulator.py 0.9
+        continue-on-error: true
+        
+      - name: Rollback if Canary Fails
+        if: steps.canary.outcome == 'failure'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/rollback_trigger.py
+        
+      - name: Fail pipeline if Canary Failed
+        if: steps.canary.outcome == 'failure'
+        run: exit 1
+
+      - name: Final Rollout Success
+        if: steps.canary.outcome == 'success'
+        run: echo "Canary successful! Deployment complete."
+        
+      - name: Upload Canary Traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-traces
+          path: traces/

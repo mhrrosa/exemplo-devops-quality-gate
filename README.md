@@ -39,6 +39,28 @@ A análise de segurança do pipeline combina duas camadas:
 - GroqCloud API — LLaMA 3.1 8B Instant (agente de IA)
 - GitHub CLI (`gh`) para criação automática de Pull Requests
 
+## Critérios de Canary e Quality Gate
+
+Para garantir a qualidade e segurança dos deploys, os seguintes limites (thresholds) são aplicados:
+
+| Componente | Critério | Limite (Threshold) | Ação em caso de falha |
+|------------|----------|-------------------|-----------------------|
+| **Quality Gate (IA)** | Cobertura de Testes | > 80% (recomendado) | Bloqueio do Deploy |
+| **Segurança (IA)** | Vulnerabilidades HIGH | 0 detectadas | Bloqueio do Deploy |
+| **Canary Deployment** | Taxa de Sucesso | 90% (mínimo) | Rollback Automático |
+
+## Scripts de Automação
+
+Localizados na pasta `scripts/`:
+
+- `deploy_gate.py`: Consulta a IA (Groq) para decidir sobre o deploy com base em métricas. Usa temperatura 0 para respostas determinísticas.
+- `canary_simulator.py`: Simula tráfego canary e monitora taxas de sucesso.
+- `rollback_trigger.py`: Executa o rollback fechando PRs ou registrando logs de erro. Possui fallback para ambientes sem `gh` CLI.
+
+## Auditoria e Rastreabilidade
+
+Todos os traces de execução (decisões da IA, passos do canary e triggers de rollback) são salvos em formato JSON na pasta `traces/` com timestamps, permitindo auditoria completa do pipeline.
+
 ## Prints das execuções
 
 ### Pipeline executado com sucesso
