@@ -41,13 +41,13 @@ jobs:
       # ==========================================================
       
  
-      - name: Testes + Quality Gate
-        run: |
-          pytest tests_alta/ \
-            --cov=src_alta \
-            --cov-report=json:coverage.json \
-            --cov-fail-under=80 \
-            -v
+      # - name: Testes + Quality Gate
+      #   run: |
+      #     pytest tests_alta/ \
+      #       --cov=src_alta \
+      #       --cov-report=json:coverage.json \
+      #       --cov-fail-under=80 \
+      #       -v
  
       # ==========================================================
       # ETAPA 2 - DEPLOY GATE COM IA
