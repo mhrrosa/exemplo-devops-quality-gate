@@ -21,113 +21,85 @@ Antes de iniciar, certifique-se de estar na branch correta e com as dependência
 # Criar branch de trabalho
 git checkout -b feature/deploy-ia-completo
 
-# Instalar biblioteca do Groq
-pip install groq
+# Instalar bibliotecas necessárias
+pip install groq pytest pytest-cov
 ```
 
-### Configuração da API Key
-Para que a IA funcione, você deve configurar a chave da API do Groq em seu ambiente:
-
-**Windows (PowerShell):**
-```powershell
-$env:GROQ_API_KEY="sua_chave_aqui"
-```
-
-**Linux/Mac:**
-```bash
-export GROQ_API_KEY="sua_chave_aqui"
-```
+### Configuração da API Key (GitHub Secrets)
+Para que a IA funcione no GitHub Actions, você deve configurar o Secret:
+1. Vá em **Settings** > **Secrets and variables** > **Actions**.
+2. Clique em **New repository secret**.
+3. Nome: `DEVOPS_SECRET` | Valor: Sua chave da Groq Cloud.
 
 ---
 
-## 🤖 Passo 2: Deploy Gate com IA (scripts/deploy_gate.py)
+## 📸 Guia para Prints de Execução
 
-O script `deploy_gate.py` atua como um porteiro inteligente. Ele lê o arquivo `coverage.json` e os arquivos na pasta `logs/` para enviar um prompt estruturado ao modelo `llama-3.3-70b-versatile`.
+Para seu relatório, você precisará de 3 cenários principais. Veja como forçar cada um:
 
-**Como testar localmente:**
-1.  Altere o arquivo `logs/app.log` para conter erros ou mensagens de sucesso.
-2.  Execute o script:
-    ```bash
-    python scripts/deploy_gate.py
-    ```
+### 1. Sucesso Total (Happy Path)
+*   **Requisito**: Cobertura > 80% e métricas estáveis.
+*   **Como fazer**: 
+    1. Garanta que `tests_alta/` cubra bem o código.
+    2. No script `deploy/canary_simulator.py`, certifique-se de que ele aponta para `metrics/system-aprovado.json`.
+    3. Faça o push. 
+*   **Print**: Tela do GitHub Actions com todos os steps em verde (check).
 
----
+### 2. Bloqueio no Deploy Gate (IA diz BLOCK)
+*   **Objetivo**: Mostrar a IA impedindo o deploy por baixa qualidade.
+*   **Como forçar**:
+    1. Crie ou altere o arquivo `coverage.json` manualmente para ter `"percent_covered": 40.0`.
+    2. Comente temporariamente a etapa de execução de testes no YAML ou apenas execute o script de gate com esse arquivo presente.
+*   **Print**: Log do step **Deploy Gate (Groq)** exibindo `Decision: BLOCK` e o motivo da IA.
 
-## 🐤 Passo 3: Canary Deploy Simulado (scripts/canary_simulator.py)
-
-O Canary libera o código gradualmente. Ele monitora métricas de CPU, Memória, Erros e Latência.
-
-**Thresholds configurados:**
-*   **CPU**: < 80%
-*   **Memória**: < 85%
-*   **Erro**: < 5.0%
-*   **Latência**: < 800ms
-
-**Como testar localmente:**
-1.  O script usa por padrão `metrics/system-aprovado.json`.
-2.  Execute:
-    ```bash
-    python scripts/canary_simulator.py
-    ```
-3.  Para simular falha, altere o script para usar `metrics/system-reprovado.json`.
-
----
-
-## 🛡️ Passo 4: Rollback Automático e Análise SRE (scripts/rollback_trigger.py)
-
-Este é o componente mais avançado. Se o Canary falhar, este script:
-1.  Localiza o último **Trace** (evidência) gerado pelo Canary.
-2.  Executa um **Rollback simulado**.
-3.  Envia os dados da falha para a IA (Groq) gerar um **Relatório Técnico de Incidente**.
-4.  Abre uma **GitHub Issue** automaticamente com o relatório.
-
-**Como testar localmente:**
-```bash
-# Primeiro, gere um trace de falha (ajustando o canary_simulator para falhar)
-python scripts/canary_simulator.py
-
-# Depois, execute o trigger de rollback
-python scripts/rollback_trigger.py
-```
+### 3. Falha no Canary e Rollback Automático
+*   **Objetivo**: Mostrar o sistema detectando erro em tempo real e revertendo.
+*   **Como forçar**:
+    1. No arquivo `deploy/canary_simulator.py`, altere a linha do arquivo de métricas para:
+       `arquivo_metricas = raiz / "metrics" / "system-reprovado.json"`
+    2. Faça o push.
+*   **Print**: 
+    - Step **Canary Deploy Simulator** com erro (vermelho).
+    - Step **Rollback + Relatório IA** executado com sucesso.
+    - **GitHub Issue** criada automaticamente com o relatório técnico da IA.
 
 ---
 
-## ⚙️ Passo 5: Integração com GitHub Actions
+## 🤖 Detalhes Técnicos dos Scripts (Pasta `deploy/`)
 
-Para rodar tudo automaticamente no GitHub, adicione os steps ao seu workflow ou crie um novo `.github/workflows/deploy-completo.yml`.
+### Deploy Gate (`deploy/deploy_gate.py`)
+Analisa `coverage.json` e `logs/*.log`. 
+**Comando local:** `py deploy/deploy_gate.py`
 
-### Exemplo de Steps no Workflow:
+### Canary Simulator (`deploy/canary_simulator.py`)
+Simula fases de 10%, 50% e 100%. Se as métricas em `metrics/` excederem os limites, ele retorna erro.
+**Thresholds**: CPU < 80%, Erro < 5%, Latência < 800ms.
+
+### Rollback Trigger (`deploy/rollback_trigger.py`)
+Acionado apenas se o Canary falhar. Ele lê o último "trace" gerado, consulta a IA para um relatório de SRE e abre a Issue.
+
+---
+
+## ⚙️ Configuração do Workflow (`.github/workflows/pipeline-devops-ia.yml`)
+
+O workflow utiliza a secret `DEVOPS_SECRET` para autenticação na API do Groq e o `GITHUB_TOKEN` padrão para criar as Issues em caso de falha.
 
 ```yaml
-      # === DEPLOY GATE COM IA ===
       - name: Deploy Gate (Groq)
-        id: deploy-gate
-        run: python scripts/deploy_gate.py
+        run: python deploy/deploy_gate.py
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.DEVOPS_SECRET }}
 
-      # === CANARY DEPLOY ===
       - name: Canary Deploy Simulator
-        id: canary
-        if: steps.deploy-gate.outcome == 'success'
-        run: python scripts/canary_simulator.py
+        run: python deploy/canary_simulator.py
 
-      # === ROLLBACK AUTOMATICO ===
-      - name: Rollback + Relatorio IA
-        if: failure() && steps.canary.outcome == 'failure'
-        run: python scripts/rollback_trigger.py
+      - name: Rollback + Relatório IA
+        if: failure()
+        run: python deploy/rollback_trigger.py
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.DEVOPS_SECRET }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
-
----
-
-## 💡 Dicas para a Apresentação
-
-1.  **Explique o p99**: No Canary, usamos latência p99 porque médias escondem problemas graves.
-2.  **IA como Decisora**: Destaque que a IA não está apenas "conversando", ela está retornando um JSON estruturado que o pipeline usa para tomar decisões lógicas (`sys.exit(0)` ou `1`).
-3.  **Cultura SRE**: O relatório gerado pela IA poupa minutos preciosos do engenheiro durante um incidente, fornecendo a causa raiz imediatamente.
 
 ---
 **Automação com DevOps e IA Generativa**

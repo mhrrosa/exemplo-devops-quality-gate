@@ -80,8 +80,6 @@ def executar_canary(arquivo_metricas: Path, salvar_em: Path = None):
 if __name__ == "__main__":
     raiz = Path(__file__).parent.parent
     
-    # Por padrão, vamos usar o aprovado para uma demo de sucesso inicial
-    # O usuário pode alterar para system-reprovado.json para ver o rollback
     arquivo_metricas = raiz / "metrics" / "system-aprovado.json"
 
     if not arquivo_metricas.exists():
