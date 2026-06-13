@@ -80,7 +80,8 @@ def executar_canary(arquivo_metricas: Path, salvar_em: Path = None):
 if __name__ == "__main__":
     raiz = Path(__file__).parent.parent
     
-    arquivo_metricas = raiz / "metrics" / "system-aprovado.json"
+    # FORÇADO: Usando métricas de reprovação para garantir o rollback no teste
+    arquivo_metricas = raiz / "metrics" / "system-reprovado.json"
 
     if not arquivo_metricas.exists():
         print(f"Arquivo de métricas não encontrado: {arquivo_metricas}")

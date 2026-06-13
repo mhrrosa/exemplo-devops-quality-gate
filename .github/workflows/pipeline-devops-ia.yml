@@ -55,7 +55,8 @@ jobs:
  
       - name: Deploy Gate (Groq)
         id: deploy-gate
-        run: python deploy/deploy_gate.py
+        # Adicionado '|| true' para o pipeline continuar mesmo com BLOCK (apenas para este teste)
+        run: python deploy/deploy_gate.py || true
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || secrets.DEVOPS_SECRET || secrets.GROQCLOUD_API_KEY }}
 
@@ -65,7 +66,7 @@ jobs:
 
       - name: Canary Deploy Simulator
         id: canary
-        if: steps.deploy-gate.outcome == 'success'
+        # Removido o check de success para forçar a execução no caminho ruim
         run: python deploy/canary_simulator.py
 
       # ==========================================================
