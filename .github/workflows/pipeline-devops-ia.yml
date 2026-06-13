@@ -57,24 +57,24 @@ jobs:
         id: deploy-gate
         run: python deploy/deploy_gate.py
         env:
-          GROQ_API_KEY: ${{ secrets.DEVOPS_SECRET }}
- 
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || secrets.DEVOPS_SECRET || secrets.GROQCLOUD_API_KEY }}
+
       # ==========================================================
       # ETAPA 3 - CANARY DEPLOY
       # ==========================================================
- 
+
       - name: Canary Deploy Simulator
         id: canary
         if: steps.deploy-gate.outcome == 'success'
         run: python deploy/canary_simulator.py
- 
+
       # ==========================================================
       # ETAPA 4 - ROLLBACK - teste de chave
       # ==========================================================
- 
+
       - name: Rollback + Relatório IA
         if: failure() && steps.canary.outcome == 'failure'
         run: python deploy/rollback_trigger.py
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || secrets.DEVOPS_SECRET || secrets.GROQCLOUD_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

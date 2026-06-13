@@ -41,9 +41,14 @@ def executar_rollback_simulado(versao_anterior: str = "v1.0.0") -> str:
 
 def gerar_relatorio_ia(trace, metricas_falha, timestamp_rollback) -> str:
     """Gera relatório de incidente usando Groq."""
-    api_key = os.getenv("GROQ_API_KEY") or os.getenv("GROQCLOUD_API_KEY")
+    api_key = (
+        os.getenv("GROQ_API_KEY") or 
+        os.getenv("GROQCLOUD_API_KEY") or 
+        os.getenv("DEVOPS_SECRET")
+    )
+
     if not api_key:
-        return "Erro: GROQ_API_KEY não configurada. Não foi possível gerar o relatório via IA."
+        return "Erro: Nenhuma chave de API Groq encontrada (GROQ_API_KEY, GROQCLOUD_API_KEY ou DEVOPS_SECRET)."
 
     client = Groq(api_key=api_key)
     

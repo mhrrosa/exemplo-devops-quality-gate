@@ -106,11 +106,19 @@ ou
 }}
 """
 
-    api_key = os.getenv("GROQ_API_KEY") or os.getenv("GROQCLOUD_API_KEY")
+    # Tenta buscar em múltiplas variáveis de ambiente possíveis
+    api_key = (
+        os.getenv("GROQ_API_KEY") or 
+        os.getenv("GROQCLOUD_API_KEY") or 
+        os.getenv("DEVOPS_SECRET")
+    )
 
     if not api_key:
-        print("\n[ERRO] GROQ_API_KEY não encontrada!")
-        print("Certifique-se de configurar a variável de ambiente GROQ_API_KEY.")
+        print("\n[ERRO] Nenhuma chave de API Groq encontrada!")
+        print("Certifique-se de configurar uma das seguintes variáveis de ambiente:")
+        print("1. GROQ_API_KEY")
+        print("2. GROQCLOUD_API_KEY")
+        print("3. DEVOPS_SECRET")
         return "BLOCK"
 
     client = Groq(api_key=api_key)
