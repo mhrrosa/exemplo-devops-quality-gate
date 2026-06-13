@@ -37,8 +37,9 @@ jobs:
           pip install groq
  
       # ==========================================================
-      # ETAPA 1 - QUALITY GATE
+      # ETAPA 1 - QUALITY GATE - teste
       # ==========================================================
+      
  
       - name: Testes + Quality Gate
         run: |
