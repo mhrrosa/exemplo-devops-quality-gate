@@ -76,5 +76,5 @@ jobs:
         if: failure() && steps.canary.outcome == 'failure'
         run: python deploy/rollback_trigger.py
         env:
-          GROQ_API_KEY: ${{ secrets.GROQCLOUD_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
