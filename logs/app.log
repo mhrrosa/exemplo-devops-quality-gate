@@ -1,5 +1,5 @@
-INFO Aplicação iniciada
+INFO Aplicação iniciada com sucesso
 INFO Usuário autenticado
-WARNING Tempo de resposta elevado
-ERROR Database connection timeout
-CRITICAL Falha ao salvar pagamento
+INFO Conexão com o banco de dados estabelecida
+INFO Pagamento processado com sucesso
+INFO Deploy concluído sem erros
