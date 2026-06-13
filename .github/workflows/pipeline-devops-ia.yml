@@ -69,7 +69,7 @@ jobs:
         run: python deploy/canary_simulator.py
  
       # ==========================================================
-      # ETAPA 4 - ROLLBACK
+      # ETAPA 4 - ROLLBACK - teste de chave
       # ==========================================================
  
       - name: Rollback + Relatório IA
